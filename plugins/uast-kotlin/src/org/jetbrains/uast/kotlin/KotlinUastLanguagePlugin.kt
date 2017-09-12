@@ -70,25 +70,16 @@ class KotlinUastLanguagePlugin : UastLanguagePlugin {
         val parentCallback = fun(): UElement? {
             val parent = element.parent
             val parentUnwrapped = KotlinConverter.unwrapElements(parent) ?: return null
-            val convertedParent = convertElementWithParent(parentUnwrapped, null)
-            return when (convertedParent) {
-                is UAnnotation -> tryParentAsAnnotationArgument(parent, convertedParent) ?: convertedParent
-                else -> convertedParent
+            if (parent is KtValueArgument && parentUnwrapped is KtAnnotationEntry) {
+                val argumentName = parent.getArgumentName()?.asName?.asString() ?: ""
+                return (convertElementWithParent(parentUnwrapped, null) as? UAnnotation)
+                        ?.attributeValues?.find { it.name == argumentName }
             }
+            else
+                return convertElementWithParent(parentUnwrapped, null)
         }
         return convertDeclaration(element, parentCallback, requiredType)
                ?: KotlinConverter.convertPsiElement(element, parentCallback, requiredType)
-    }
-
-    private fun tryParentAsAnnotationArgument(parent: PsiElement, uAnnotation: UAnnotation): UNamedExpression? {
-        val valueArgument = PsiTreeUtil.getParentOfType(parent, KtValueArgument::class.java, false) ?: return null
-        valueArgument.getArgumentName()?.asName?.asString()?.let { argumentName ->
-            return uAnnotation.attributeValues.find { it.name == argumentName }
-        }
-        (valueArgument.parent as? KtValueArgumentList)?.arguments?.indexOf(valueArgument)?.let { index ->
-            return uAnnotation.attributeValues.getOrNull(index)
-        }
-        return null
     }
 
     override fun getMethodCallExpression(
@@ -118,7 +109,7 @@ class KotlinUastLanguagePlugin : UastLanguagePlugin {
         val resolvedCall = element.getResolvedCall(element.analyze()) ?: return null
         val resultingDescriptor = resolvedCall.resultingDescriptor
         if (resultingDescriptor !is ConstructorDescriptor
-                || resultingDescriptor.returnType.constructor.declarationDescriptor?.name?.asString() != fqName) {
+            || resultingDescriptor.returnType.constructor.declarationDescriptor?.name?.asString() != fqName) {
             return null
         }
 
@@ -215,7 +206,6 @@ internal object KotlinConverter {
         is KtValueArgumentList -> unwrapElements(element.parent)
         is KtValueArgument -> unwrapElements(element.parent)
         is KtDeclarationModifierList -> unwrapElements(element.parent)
-        is KtStringTemplateExpression -> unwrapElements(element.parent)
         else -> element
     }
 
