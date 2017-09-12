@@ -37,6 +37,11 @@ import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
 fun KtElement.getResolutionFacade(): ResolutionFacade =
         KotlinCacheService.getInstance(project).getResolutionFacade(listOf(this))
 
+/**
+ * For local declarations is equivalent to resolveToDescriptorIfAny(bodyResolveMode) ?: throw NoDescriptorForDeclarationException
+ *
+ * But for non-local declarations it ignores bodyResolveMode and may work differently, so be careful!
+ */
 fun KtDeclaration.resolveToDescriptor(bodyResolveMode: BodyResolveMode = BodyResolveMode.FULL): DeclarationDescriptor =
         getResolutionFacade().resolveToDescriptor(this, bodyResolveMode)
 
